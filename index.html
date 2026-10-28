@@ -59,6 +59,14 @@ button{font:inherit;color:inherit;cursor:pointer;touch-action:manipulation}
 .speak{border:0;background:var(--blue);color:#fff;border-radius:14px;width:44px;height:44px;display:grid;place-items:center;flex:none;box-shadow:0 4px 0 var(--blue-shadow)}
 .speak:active{transform:translateY(4px);box-shadow:0 0 0 var(--blue-shadow)}
 
+/* Boshlash ekrani */
+#splash{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;min-height:100vh;min-height:100dvh}
+#splash[hidden]{display:none}
+#splash .btn{max-width:320px}
+.camel{width:190px;animation:bobc 1s ease-in-out infinite alternate}
+.camel svg{display:block;width:100%}
+@keyframes bobc{to{transform:translateY(-8px)}}
+
 /* Bosh sahifa */
 .hbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);display:flex;align-items:center;gap:14px;padding-block:12px;border-bottom:2px solid var(--line);margin-inline:calc(-1 * max(16px,env(safe-area-inset-left,0px)));padding-inline:max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px))}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:10}
@@ -206,8 +214,14 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 </head>
 <body>
 <main id="app" style="height:100%">
+<!-- BOSHLASH EKRANI -->
+<section id="splash" class="view">
+  <div class="camel"><svg viewBox="0 0 100 100" aria-hidden="true"><g fill="#d9a05b"><path d="M16 58Q8 62 10 78" stroke="#c98b45" stroke-width="5" stroke-linecap="round" fill="none"/><rect x="24" y="70" width="9" height="24" rx="4.5"/><rect x="38" y="72" width="9" height="22" rx="4.5"/><rect x="56" y="72" width="9" height="22" rx="4.5"/><rect x="70" y="70" width="9" height="24" rx="4.5"/><ellipse cx="37" cy="38" rx="11" ry="15" fill="#c98b45"/><ellipse cx="60" cy="38" rx="11" ry="15" fill="#c98b45"/><ellipse cx="49" cy="62" rx="32" ry="19"/><path d="M66 58Q80 54 76 30L90 30Q92 58 82 72Z"/><ellipse cx="85" cy="26" rx="12" ry="9"/></g><ellipse cx="49" cy="64" rx="15" ry="9" fill="#1cb0f6"/><ellipse cx="49" cy="64" rx="8" ry="4" fill="#ffc800"/><ellipse cx="78" cy="15" rx="3" ry="5" fill="#c98b45"/><circle cx="83" cy="23" r="3.5" fill="#3c3c3c"/><circle cx="84" cy="22" r="1.2" fill="#fff"/><circle cx="90" cy="30" r="3" fill="#ff8a8a" opacity=".7"/><path d="M92 25q2 1 2 4" stroke="#8a5a28" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg></div>
+  <button class="btn" id="startBtn" type="button">Boshlash</button>
+</section>
+
 <!-- BOSH SAHIFA -->
-<section id="home" class="view">
+<section id="home" class="view" hidden>
   <header class="hbar">
     <div class="flag"><i aria-hidden="true"></i>Rus tili</div>
     <span class="stat xp" id="xpStat"></span>
@@ -290,9 +304,11 @@ var ICON={
 function mascotSvg(w){return '<svg class="mascot" viewBox="0 0 120 150" aria-hidden="true"'+(w?' style="width:'+w+'px"':'')+'><use href="#matr"/></svg>';}
 
 /* ============ Tovush ============ */
-var ac=null;
+var ac=null,AU=null,SOUND=false,SID=0,VR=null;
+var SIL='data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+
 function tone(seq){
-  if(!save.sound)return;
+  if(!save.sound||!SOUND)return;
   try{
     ac=ac||new (window.AudioContext||window.webkitAudioContext)();
     if(ac.state==="suspended")ac.resume();
@@ -308,12 +324,38 @@ function tone(seq){
   }catch(e){}
 }
 var sfx={ok:function(){tone([660,880]);},bad:function(){tone([260,196]);},win:function(){tone([523,659,784,1047]);}};
-function say(text){
-  if(!save.sound)return;
+
+function pickV(){try{VR=window.speechSynthesis.getVoices().filter(function(v){return /^ru/i.test(v.lang);})[0]||null;}catch(e){}}
+try{pickV();window.speechSynthesis.onvoiceschanged=pickV;}catch(e){}
+
+// Birinchi bosishda brauzer ovozni ochadi
+function unlock(){
+  try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();if(ac.state==="suspended")ac.resume();}catch(e){}
+  try{AU=new Audio();AU.src=SIL;var p=AU.play();if(p&&p.catch)p.catch(function(){});}catch(e){}
+  try{var u=new SpeechSynthesisUtterance(" ");u.volume=0;window.speechSynthesis.speak(u);}catch(e){}
+}
+// Zaxira: Google ovozi (telefonda rus ovozi bo'lmasa). Bitta Audio elementi ishlatiladi.
+function web(t){
+  try{window.speechSynthesis.cancel();}catch(e){}
   try{
-    var u=new SpeechSynthesisUtterance(text);u.lang="ru-RU";u.rate=0.85;
-    window.speechSynthesis.cancel();window.speechSynthesis.speak(u);
+    if(!AU)AU=new Audio();
+    AU.src="https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=ru&q="+encodeURIComponent(t);
+    var p=AU.play();if(p&&p.catch)p.catch(function(){});
   }catch(e){}
+}
+function say(text){
+  if(!save.sound||!SOUND)return;
+  var id=++SID;pickV();
+  if(!VR||!("speechSynthesis" in window))return web(text);
+  var started=false;
+  var u=new SpeechSynthesisUtterance(text);
+  u.lang="ru-RU";u.rate=0.85;u.voice=VR;
+  u.onstart=function(){started=true;};
+  u.onerror=function(){if(!started&&id===SID)web(text);};
+  window._u=u;
+  try{window.speechSynthesis.cancel();}catch(e){}
+  setTimeout(function(){try{window.speechSynthesis.speak(u);}catch(e){}},80);
+  setTimeout(function(){if(!started&&id===SID){try{window.speechSynthesis.cancel();}catch(e){}web(text);}},1500);
 }
 
 /* ============ Dars mazmuni ============ */
@@ -401,8 +443,8 @@ var STAGES=[
 
 /* ============ O'yin holati ============ */
 var G=null;
-var home=$("#home"),game=$("#game"),result=$("#result");
-function view(v){home.hidden=v!=="home";game.hidden=v!=="game";result.hidden=v!=="result";window.scrollTo(0,0);}
+var splash=$("#splash"),home=$("#home"),game=$("#game"),result=$("#result");
+function view(v){splash.hidden=v!=="splash";home.hidden=v!=="home";game.hidden=v!=="game";result.hidden=v!=="result";window.scrollTo(0,0);}
 function starsOf(id){return save.stars[id]||0;}
 function unlocked(i){return i===0||starsOf(STAGES[i-1].id)>0;}
 function nextStageIdx(){for(var i=0;i<STAGES.length;i++){if(unlocked(i)&&!starsOf(STAGES[i].id))return i;}return -1;}
@@ -725,7 +767,14 @@ function fail(){
   view("result");
 }
 
-renderHome();view("home");
+/* ============ Boshlash tugmasi ============ */
+$("#startBtn").addEventListener("click",function(){
+  SOUND=true;
+  unlock();
+  setTimeout(function(){say("Привет!");},150);
+  renderHome();view("home");
+});
+view("splash");
 })();
 </script>
 </body>
